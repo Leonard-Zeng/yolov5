@@ -19,17 +19,51 @@ class Albumentations:
         self.transform = None
         try:
             import albumentations as A
+            from albumentations.pytorch.transforms import ToTensorV2
+            from utils.color_correction import color_correction
+
+            # Augmentations
+            class Color_Correction(A.ImageOnlyTransform):
+                def apply(self, img, **params) -> np.ndarray:
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    mu, sigma = 0, .5  # mean and standard deviation
+                    s1, s2 = np.random.normal(mu, sigma, 2)
+                    img = color_correction(pixels=img, x=s1, y=s2, adjustment_intensity=1)
+                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                    return img
+
             check_version(A.__version__, '1.0.3', hard=True)  # version requirement
 
+            # default transform
+            # self.transform = A.Compose([
+            #     A.Blur(p=0.01),
+            #     A.MedianBlur(p=0.01),
+            #     A.ToGray(p=0.01),
+            #     A.CLAHE(p=0.01),
+            #     A.RandomBrightnessContrast(p=0.0),
+            #     A.RandomGamma(p=0.0),
+            #     A.ImageCompression(quality_lower=75, p=0.0)],
+            #     bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+
+            # Color Correction
+            # self.transform = A.Compose([
+            #     Color_Correction()
+            #     # ToTensorV2(p=1.0)
+            # ], bbox_params=A.BboxParams(format='yolo',  label_fields=['class_labels']))
+
+            # intensive transform
             self.transform = A.Compose([
-                A.Blur(p=0.01),
-                A.MedianBlur(p=0.01),
-                A.ToGray(p=0.01),
-                A.CLAHE(p=0.01),
-                A.RandomBrightnessContrast(p=0.0),
-                A.RandomGamma(p=0.0),
-                A.ImageCompression(quality_lower=75, p=0.0)],
-                bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+                A.CLAHE(p=0.5),
+                A.RandomGamma(p=0.5),
+                # A.OpticalDistortion(p=0.5),
+                A.RandomContrast(p=0.5),
+                A.RandomRotate90(p=0.5),
+                A.RandomBrightness(p=0.5),
+                # A.RandomCropNearBBox(p=0.5),
+                Color_Correction(),
+                A.RandomToneCurve(p=0.5),
+                A.ImageCompression(quality_lower=75, p=0.1)
+            ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
 
             LOGGER.info(colorstr('albumentations: ') + ', '.join(f'{x}' for x in self.transform.transforms if x.p))
         except ImportError:  # package not installed, skip
